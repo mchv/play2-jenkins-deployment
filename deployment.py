@@ -36,6 +36,10 @@ play_path = parser.get('play', 'path')
 play_app_git = parser.get('application','git')
 play_app_path = parser.get('application', 'path')
 play_app_port = parser.get('application', 'port')
+play_app_apply_evolutions = parser.get('application', 'apply_evolutions')
+play_app_conf_file = parser.get('application', 'conf_file')
+
+env = parser.get('application', 'env')
 
 def main():
 
@@ -59,8 +63,17 @@ def main():
             print ""
             print "\t ~ Deployment of " + str(buildRevision) + " ( Build " + str(buildNumber) + " ) "  + "start "
             print ""
+            
+            #go in the work directory        
+            previous = os.getcwd()
+            os.chdir(env)
+
             checkout(buildRevision)
             deploy()
+
+            #go back in our current directory
+            os.chdir(previous)
+
             updateLastDeployed(buildNumber)
             print ""
             print "\t ~  " + str(buildRevision) + " has been successfuly deployed !"
@@ -167,7 +180,7 @@ def deploy():
                 pass
             else:
                 raise
-        subprocess.Popen('target/start -DapplyEvolutions.default=true -Dhttp.port='+play_app_port, shell=True)
+        subprocess.Popen('target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port, shell=True)
     else:
         # This should never happen as we retrieve opnly green builds
         print '\t ~ Error: Compilation failed !'
