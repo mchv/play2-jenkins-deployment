@@ -139,7 +139,7 @@ def getLastDeployed():
 def updateLastDeployed(buildNumber):
     file = open("LASTDEPLOYED", "w")
     file.write(str(buildNumber))
-    file.close();
+    file.close()
 
 def checkout(buildRevision):
     if not os.path.exists(jobname):
@@ -176,22 +176,26 @@ def deploy():
             pass
         except OSError as e:
             if e.errno == errno.ESRCH:
-                # No running instance to term or kill, no need to worry
+                # No running instance to term or kill, we need to remove the file
+                deletePidFile()
                 pass
             else:
                 raise
         subprocess.Popen('target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port, shell=True)
     else:
-        # This should never happen as we retrieve opnly green builds
+        # This should never happen as we retrieve only green builds
         print '\t ~ Error: Compilation failed !'
         sys.exit(6)
-    os.chdir(previous);  
+    os.chdir(previous)
 
 def runningPid():
     file = open("RUNNING_PID", "r")
     content = file.read()
     pid = int(content)
     file.close()
-    return pid;
+    return pid
 
-main();
+def deletePidFile():
+    os.remove("RUNNING_PID")
+
+main()
