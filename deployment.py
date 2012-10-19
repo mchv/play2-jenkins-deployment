@@ -1,12 +1,12 @@
 #!/usr/bin/python
 #
 # author: Mariot Chauvin <mch@zenexity.com>
-# 
+#
 # A python script to deploy automatically play2 applications when a new green/blue build is available from Jenkins.
-# The script polls Jenkins through its json api, and store the last build number to check if it needs to redeploy. 
+# The script polls Jenkins through its json api, and store the last build number to check if it needs to redeploy.
 #
 #  The script apply database evolutions automatically without further notice !
-#  
+#
 #  2 - Connection failed to Jenkins server
 #  3 - JSON parsing failed
 #  4 - JSON does not contain expected datas
@@ -32,7 +32,7 @@ token = parser.get('jenkins', 'token')
 poll_delay = parser.get('jenkins', 'poll_delay')
 
 play_path = parser.get('play', 'path')
-    
+
 play_app_git = parser.get('application','git')
 play_app_path = parser.get('application', 'path')
 play_app_port = parser.get('application', 'port')
@@ -45,7 +45,7 @@ def main():
 
     print ""
     print "\t -- Play2 continuous deployment  --"
-    print ""    
+    print ""
 
     #Quit gracefully
     signal.signal(signal.SIGINT, quit)
@@ -54,17 +54,17 @@ def main():
     #Loop until interruption or kill signals
     while True:
         jsonBuildStatus = getBuildStatus()
-        
+
         buildNumber = getBuildNumber(jsonBuildStatus)
         buildRevision = getBuildRevision(jsonBuildStatus)
-        
+
         lastDeployed = getLastDeployed()
         if (lastDeployed < buildNumber):
             print ""
             print "\t ~ Deployment of " + str(buildRevision) + " ( Build " + str(buildNumber) + " ) "  + "start "
             print ""
-            
-            #go in the work directory        
+
+            #go in the work directory
             previous = os.getcwd()
             os.chdir(env)
 
@@ -90,9 +90,9 @@ def quit(signum, frame):
 
 def getBuildStatus():
     try:
-        jenkinsStream = connect(server, jobname, user, token) 
+        jenkinsStream = connect(server, jobname, user, token)
     except urllib2.HTTPError, e:
-        print "\t ~ Error: Connection failed to  " + server + " with job name " + jobname + " - "  + str(e.code) 
+        print "\t ~ Error: Connection failed to  " + server + " with job name " + jobname + " - "  + str(e.code)
         sys.exit(2)
 
     try:
@@ -101,7 +101,7 @@ def getBuildStatus():
         print "\t ~ Error: Json parsing failed"
         sys.exit(3)
 
-def connect(server, jobname, user, token): 
+def connect(server, jobname, user, token):
     jenkinsUrl = "http://" + server + "/job/" + jobname + "/lastSuccessfulBuild/api/json";
     req = urllib2.Request(jenkinsUrl)
     req.add_header('Authorization', encodeUserData(user, token))
@@ -125,7 +125,7 @@ def getBuildRevision(buildStatusJson):
             return actions[1]["lastBuiltRevision"]["SHA1"]
         elif  actions[2].has_key("lastBuiltRevision"):
             return actions[2]["lastBuiltRevision"]["SHA1"]
-    
+
     print "\t ~ Error: Unable to get build revision from JSON"
     sys.exit(4)
 
