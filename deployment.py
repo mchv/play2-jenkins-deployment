@@ -13,7 +13,7 @@
 #  5 - Git clone or checkout failed
 #  6 - Compilation of play2 application failed
 
-import sys, os, signal, errno, subprocess
+import sys, os, signal, errno, subprocess, os.path
 import time
 import urllib2, json
 from ConfigParser import SafeConfigParser
@@ -176,8 +176,10 @@ def deploy():
             pass
         except OSError as e:
             if e.errno == errno.ESRCH:
-                # No running instance to term or kill, we need to remove the file
-                deletePidFile()
+                # No running instance to term or kill
+                if (pidFile()):
+                    # we need to remove the file if there is one, otherwise play will not start
+                    deletePidFile()
                 pass
             else:
                 raise
@@ -194,6 +196,9 @@ def runningPid():
     pid = int(content)
     file.close()
     return pid
+
+def pidFile():
+    return os.path.isfile("RUNNING_PID")
 
 def deletePidFile():
     os.remove("RUNNING_PID")
