@@ -39,6 +39,14 @@ play_app_port = parser.get('application', 'port')
 play_app_apply_evolutions = parser.get('application', 'apply_evolutions')
 play_app_conf_file = parser.get('application', 'conf_file')
 
+play_app_logger = False
+play_app_logger_file = ""
+
+if (parser.has_option('application', 'logger_file')):
+    play_app_logger = True
+    play_app_logger_file = parser.get('application', 'logger_file')
+
+
 env = parser.get('application', 'env')
 
 def main():
@@ -183,7 +191,11 @@ def deploy():
                 pass
             else:
                 raise
-        subprocess.Popen('target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port, shell=True)
+
+        cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
+        if (play_app_logger):
+            cmd = cmd + ' -Dlogger.resource=' + play_app_logger_file
+        subprocess.Popen(cmd, shell=True)
     else:
         # This should never happen as we retrieve only green builds
         print '\t ~ Error: Compilation failed !'
