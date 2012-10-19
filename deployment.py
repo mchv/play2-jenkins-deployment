@@ -157,8 +157,8 @@ def checkout(buildRevision):
             sys.exit(5)
     previous = os.getcwd()
     os.chdir(jobname)
-    #subprocess.call('git pull', shell=True)
-    s = subprocess.call('git checkout ' + str(buildRevision), shell=True)
+    subprocess.call('git fetch', shell=True)
+    s = subprocess.call('git checkout -f ' + str(buildRevision), shell=True)
     if (s != 0):
         print "\t ~ Error: Git checkout of " + str(buildRevision) + " failed"
         sys.exit(5)
