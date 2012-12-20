@@ -17,6 +17,7 @@ import sys, os, signal, errno, subprocess, os.path
 import time
 import urllib2, json
 from ConfigParser import SafeConfigParser
+import collections
 
 # reading configuration outside of a function context
 # to have always access to it
@@ -61,33 +62,89 @@ def main():
 
     #Loop until interruption or kill signals
     while True:
-        jsonBuildStatus = getBuildStatus()
 
-        buildNumber = getBuildNumber(jsonBuildStatus)
-        buildRevision = getBuildRevision(jsonBuildStatus)
-
-        lastDeployed = getLastDeployed()
-        if (lastDeployed < buildNumber):
+        need = needDeployment()
+        
+        if (need.value):
             print ""
-            print "\t ~ Deployment of " + str(buildRevision) + " ( Build " + str(buildNumber) + " ) "  + "start "
+            print "\t ~ Deployment of " + str(need.revision) + " ( Build " + str(need.number) + " ) "  + "start "
             print ""
 
             #go in the work directory
             previous = os.getcwd()
             os.chdir(env)
 
-            checkout(buildRevision)
+            checkout(need.revision)
             deploy()
 
             #go back in our current directory
             os.chdir(previous)
 
-            updateLastDeployed(buildNumber)
+            updateLastDeployed(need.number)
             print ""
-            print "\t ~  " + str(buildRevision) + " has been successfuly deployed !"
+            print "\t ~  " + str(need.revision) + " has been successfuly deployed !"
             print ""
+        
+        elif not(isRunning()):
+            print ""
+            print "\t ~ Start of alreday checked out application start "
+            print ""
+            deploy()
+            print ""
+            print "\t ~ has been successfuly deployed !"
+            print ""    
+
         time.sleep(int(poll_delay));
 
+
+def needDeployment():
+
+    result = collections.namedtuple('value', ['revision', 'number'])
+    result.value = False
+
+    try:
+        jsonBuildStatus = getBuildStatus()
+        buildNumber = getBuildNumber(jsonBuildStatus)
+        buildRevision = getBuildRevision(jsonBuildStatus)
+        lastDeployed = getLastDeployed()
+
+        result.revision = buildRevision
+        result.number = buildNumber
+        result.value = lastDeployed < buildNumber
+    
+    except (urllib2.HTTPError, urllib2.URLError) as e:
+        print "\t ~ Error: Connection failed to  " + server + " with job name " + jobname + " - "
+
+    except IOError as e:
+        print "\t ~ Error: Could not find LASTDEPLOYED file"
+        print e
+
+    except Exception as e:
+        print "\t ~ Error: Json parsing failed"
+        print e
+
+    return result
+
+
+def checkedout():
+    current = os.getcwd()
+    p1 = os.path.join(current, env)
+    p2 = os.path.join(p1, jobname)
+    p3 = os.path.join(p2, play_app_path)
+    return os.path.isdir(p3)
+
+def isRunning():
+    #go in the work directory
+    previous = os.getcwd()
+    os.chdir(env)
+    os.chdir(jobname)
+    os.chdir(play_app_path)
+
+    run = pidFile() and pidAlive(runningPid())
+ 
+    #go back in our current directory
+    os.chdir(previous)
+    return run
 
 def quit(signum, frame):
     # when we quit we set back the last deployed to 0
@@ -97,17 +154,8 @@ def quit(signum, frame):
     sys.exit(0)
 
 def getBuildStatus():
-    try:
-        jenkinsStream = connect(server, jobname, user, token)
-    except urllib2.HTTPError, e:
-        print "\t ~ Error: Connection failed to  " + server + " with job name " + jobname + " - "  + str(e.code)
-        sys.exit(2)
-
-    try:
-        return json.load( jenkinsStream )
-    except:
-        print "\t ~ Error: Json parsing failed"
-        sys.exit(3)
+    jenkinsStream = connect(server, jobname, user, token)
+    return json.load(jenkinsStream)
 
 def connect(server, jobname, user, token):
     jenkinsUrl = "http://" + server + "/job/" + jobname + "/lastSuccessfulBuild/api/json";
@@ -123,8 +171,7 @@ def getBuildNumber(buildStatusJson):
     if buildStatusJson.has_key( "number" ):
         return buildStatusJson["number"]
     else:
-        print "\t ~ Error: Unable to get build number from JSON"
-        sys.exit(4)
+        raise Exception("\t ~ Error: Unable to get build number from JSON")
 
 def getBuildRevision(buildStatusJson):
     if buildStatusJson.has_key( "actions" ):
@@ -134,14 +181,13 @@ def getBuildRevision(buildStatusJson):
         elif  actions[2].has_key("lastBuiltRevision"):
             return actions[2]["lastBuiltRevision"]["SHA1"]
 
-    print "\t ~ Error: Unable to get build revision from JSON"
-    sys.exit(4)
+    raise Exception("\t ~ Error: Unable to get build revision from JSON")
 
 def getLastDeployed():
     file = open("LASTDEPLOYED", "r")
     content = file.read()
     lastDeployed = int(content)
-    file.close();
+    file.close()
     return lastDeployed
 
 def updateLastDeployed(buildNumber):
@@ -174,23 +220,20 @@ def deploy():
         # we could do far better with haproxy
         # and 2 servers to have zero downtime
         try:
-            pid = runningPid();
-            os.kill(pid, signal.SIGTERM)
-            #leave 3 seconds to terminate properly
-            time.sleep(3)
-            os.kill(pid, signal.SIGKILL)
-        except IOError as e:
-            # No PID file found, no need to worry
-            pass
-        except OSError as e:
-            if e.errno == errno.ESRCH:
+            pid = runningPid()
+            if pidAlive(pid):
+                os.kill(pid, signal.SIGTERM)
+                #leave 3 seconds to terminate properly
+                time.sleep(3)
+                os.kill(pid, signal.SIGKILL)
+            else:
                 # No running instance to term or kill
                 if (pidFile()):
                     # we need to remove the file if there is one, otherwise play will not start
                     deletePidFile()
-                pass
-            else:
-                raise
+        except IOError as e:
+            # No PID file found, no need to worry
+            pass
 
         cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
         if (play_app_logger):
@@ -208,6 +251,14 @@ def runningPid():
     pid = int(content)
     file.close()
     return pid
+
+def pidAlive(pid):
+    try:
+        os.kill(pid, 0)
+    except OSError, err:
+        if err.errno == errno.ESRCH:
+            return False
+    return True
 
 def pidFile():
     return os.path.isfile("RUNNING_PID")
