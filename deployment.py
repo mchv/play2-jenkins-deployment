@@ -154,10 +154,16 @@ def isRunning():
     return run
 
 def quit(signum, frame):
+    global process
+    # we kill the serv when quitting.
+    if 'process' in globals():
+        os.killpg(process.pid, signal.SIGTERM)
+
     # when we quit we set back the last deployed to 0
     # this allow us to restart gracefully
     updateLastDeployed(0)
     print "\n\t -- Terminating --"
+
     sys.exit(0)
 
 def getBuildStatus():
@@ -218,6 +224,7 @@ def checkout(buildRevision):
     os.chdir(previous)
 
 def deploy():
+    global process
     previous = os.getcwd()
     os.chdir(jobname)
     os.chdir(play_app_path)
@@ -245,7 +252,7 @@ def deploy():
         cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.file=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
         if (play_app_logger):
             cmd = cmd + ' -Dlogger.resource=' + play_app_logger_file
-        subprocess.Popen(cmd, shell=True)
+        process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
     else:
         # This should never happen as we retrieve only green builds
         print '\t ~ Error: Compilation failed !'
