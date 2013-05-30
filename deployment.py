@@ -34,7 +34,7 @@ poll_delay = parser.get('jenkins', 'poll_delay')
 
 play_path = parser.get('play', 'path')
 
-play_app_git = parser.get('application','git')
+play_app_git = parser.get('application', 'git')
 play_app_path = parser.get('application', 'path')
 play_app_port = parser.get('application', 'port')
 play_app_apply_evolutions = parser.get('application', 'apply_evolutions')
@@ -86,6 +86,10 @@ def main():
             print ""
 
         elif not(isRunning()):
+            #go in the work directory
+            previous = os.getcwd()
+            os.chdir(env)
+
             print ""
             print "\t ~ Start of alreday checked out application start "
             print ""
@@ -93,6 +97,9 @@ def main():
             print ""
             print "\t ~ has been successfuly deployed !"
             print ""
+
+            #go back in our current directory
+            os.chdir(previous)
 
         time.sleep(int(poll_delay));
 
