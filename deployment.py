@@ -64,7 +64,7 @@ def main():
     while True:
 
         need = needDeployment()
-        
+
         if (need.value):
             print ""
             print "\t ~ Deployment of " + str(need.revision) + " ( Build " + str(need.number) + " ) "  + "start "
@@ -84,7 +84,7 @@ def main():
             print ""
             print "\t ~  " + str(need.revision) + " has been successfuly deployed !"
             print ""
-        
+
         elif not(isRunning()):
             print ""
             print "\t ~ Start of alreday checked out application start "
@@ -92,7 +92,7 @@ def main():
             deploy()
             print ""
             print "\t ~ has been successfuly deployed !"
-            print ""    
+            print ""
 
         time.sleep(int(poll_delay));
 
@@ -111,7 +111,7 @@ def needDeployment():
         result.revision = buildRevision
         result.number = buildNumber
         result.value = lastDeployed < buildNumber
-    
+
     except (urllib2.HTTPError, urllib2.URLError) as e:
         print "\t ~ Error: Connection failed to  " + server + " with job name " + jobname + " - "
 
@@ -141,7 +141,7 @@ def isRunning():
     os.chdir(play_app_path)
 
     run = pidFile() and pidAlive(runningPid())
- 
+
     #go back in our current directory
     os.chdir(previous)
     return run
@@ -235,7 +235,7 @@ def deploy():
             # No PID file found, no need to worry
             pass
 
-        cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
+        cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.file=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
         if (play_app_logger):
             cmd = cmd + ' -Dlogger.resource=' + play_app_logger_file
         subprocess.Popen(cmd, shell=True)
