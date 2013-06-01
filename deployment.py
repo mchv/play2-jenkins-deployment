@@ -34,7 +34,7 @@ poll_delay = parser.get('jenkins', 'poll_delay')
 
 play_path = parser.get('play', 'path')
 
-play_app_git = parser.get('application','git')
+play_app_git = parser.get('application', 'git')
 play_app_path = parser.get('application', 'path')
 play_app_port = parser.get('application', 'port')
 play_app_apply_evolutions = parser.get('application', 'apply_evolutions')
@@ -64,7 +64,7 @@ def main():
     while True:
 
         need = needDeployment()
-        
+
         if (need.value):
             print ""
             print "\t ~ Deployment of " + str(need.revision) + " ( Build " + str(need.number) + " ) "  + "start "
@@ -84,15 +84,22 @@ def main():
             print ""
             print "\t ~  " + str(need.revision) + " has been successfuly deployed !"
             print ""
-        
+
         elif not(isRunning()):
+            #go in the work directory
+            previous = os.getcwd()
+            os.chdir(env)
+
             print ""
             print "\t ~ Start of alreday checked out application start "
             print ""
             deploy()
             print ""
             print "\t ~ has been successfuly deployed !"
-            print ""    
+            print ""
+
+            #go back in our current directory
+            os.chdir(previous)
 
         time.sleep(int(poll_delay));
 
@@ -111,7 +118,7 @@ def needDeployment():
         result.revision = buildRevision
         result.number = buildNumber
         result.value = lastDeployed < buildNumber
-    
+
     except (urllib2.HTTPError, urllib2.URLError) as e:
         print "\t ~ Error: Connection failed to  " + server + " with job name " + jobname + " - "
 
@@ -141,16 +148,22 @@ def isRunning():
     os.chdir(play_app_path)
 
     run = pidFile() and pidAlive(runningPid())
- 
+
     #go back in our current directory
     os.chdir(previous)
     return run
 
 def quit(signum, frame):
+    global process
+    # we kill the serv when quitting.
+    if 'process' in globals():
+        os.killpg(process.pid, signal.SIGTERM)
+
     # when we quit we set back the last deployed to 0
     # this allow us to restart gracefully
     updateLastDeployed(0)
     print "\n\t -- Terminating --"
+
     sys.exit(0)
 
 def getBuildStatus():
@@ -211,6 +224,7 @@ def checkout(buildRevision):
     os.chdir(previous)
 
 def deploy():
+    global process
     previous = os.getcwd()
     os.chdir(jobname)
     os.chdir(play_app_path)
@@ -235,10 +249,10 @@ def deploy():
             # No PID file found, no need to worry
             pass
 
-        cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.resource=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
+        cmd = 'target/start -DapplyEvolutions.default=' + play_app_apply_evolutions + ' -Dconfig.file=' + play_app_conf_file +  ' -Dhttp.port='+play_app_port
         if (play_app_logger):
             cmd = cmd + ' -Dlogger.resource=' + play_app_logger_file
-        subprocess.Popen(cmd, shell=True)
+        process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
     else:
         # This should never happen as we retrieve only green builds
         print '\t ~ Error: Compilation failed !'
